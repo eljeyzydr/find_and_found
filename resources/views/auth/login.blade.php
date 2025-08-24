@@ -66,7 +66,7 @@
 
                         <div class="text-center">
                             <a href="{{ route('password.request') }}" class="text-decoration-none">
-                                Lupa password?
+                                <i class="fas fa-key me-1"></i>Lupa password?
                             </a>
                         </div>
                     </form>

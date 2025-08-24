@@ -1,12 +1,11 @@
 <?php
-// app/Models/Item.php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage; // TAMBAHKAN INI
+use Illuminate\Support\Facades\Storage;
 
 class Item extends Model
 {
@@ -133,44 +132,63 @@ class Item extends Model
         return $this->status === 'found';
     }
 
-   
-
-    // PERBAIKI BAGIAN INI
-    public function getFirstPhotoAttribute()
-{
-    if (!empty($this->photos) && count($this->photos) > 0) {
-        return asset('storage/items/' . $this->photos[0]);
-    }
-
-    return asset('images/no-image.png'); // fallback default
-
- // fallback default
-    }
-
-    // optional: status label
     public function getStatusLabelAttribute()
     {
-        return ucfirst($this->status); // misalnya: "Lost" / "Found"
+        return $this->status === 'lost' ? 'Hilang' : 'Ditemukan';
+    }
+
+    public function getStatusColorAttribute()
+    {
+        return $this->status === 'lost' ? 'danger' : 'success';
+    }
+
+    // ✅ FIXED: Photo attributes dengan pengecekan yang benar
+    public function getFirstPhotoAttribute()
+    {
+        if (!empty($this->photos) && is_array($this->photos) && count($this->photos) > 0) {
+            // Cek apakah file benar-benar ada
+            $photoPath = 'items/' . $this->photos[0];
+            if (Storage::disk('public')->exists($photoPath)) {
+                return asset('storage/' . $photoPath);
+            }
+        }
+        
+        return asset('images/no-image.png');
     }
 
     public function getPhotoUrlsAttribute()
-{
-    if ($this->photos) {
-        return array_map(function($photo) {
-            return asset('storage/items/' . $photo);
-        }, $this->photos);
+    {
+        if (!empty($this->photos) && is_array($this->photos)) {
+            return array_map(function($photo) {
+                $photoPath = 'items/' . $photo;
+                if (Storage::disk('public')->exists($photoPath)) {
+                    return asset('storage/' . $photoPath);
+                }
+                return asset('images/no-image.png');
+            }, $this->photos);
+        }
+        return [];
     }
-    return [];
-}
+
+    // Helper method untuk cek foto exists
+    public function getValidPhotosAttribute()
+    {
+        if (!empty($this->photos) && is_array($this->photos)) {
+            return array_filter($this->photos, function($photo) {
+                return Storage::disk('public')->exists('items/' . $photo);
+            });
+        }
+        return [];
+    }
 
     public function getEventDateFormattedAttribute()
     {
-        return \Illuminate\Support\Carbon::parse($this->event_date)->format('d M Y');
+        return $this->event_date->format('d M Y');
     }
 
     public function getEventDateHumanAttribute()
     {
-        return \Illuminate\Support\Carbon::parse($this->event_date)->diffForHumans();
+        return $this->event_date->diffForHumans();
     }
 
     public function incrementViews()

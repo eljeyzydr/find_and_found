@@ -128,14 +128,15 @@
                         <h5><i class="fas fa-camera me-2"></i>Photos</h5>
                     </div>
                     <div class="section-content">
-                        <!-- Existing Photos -->
+                        <!-- ✅ FIXED: Existing Photos dengan path yang benar -->
                         @if($item->photos && count($item->photos) > 0)
                             <div class="existing-photos mb-3">
                                 <label class="form-label">Current Photos</label>
-                                <div class="photos-grid">
+                                <div class="photos-grid" id="existingPhotosGrid">
                                     @foreach($item->photos as $index => $photo)
                                         <div class="photo-item" data-photo="{{ $photo }}">
-                                            <img src="{{ asset('uploads/items/' . $photo) }}" alt="Item photo">
+                                            <img src="{{ asset('storage/items/' . $photo) }}" alt="Item photo" 
+                                                 onerror="this.src='{{ asset('images/no-image.png') }}'">
                                             <div class="photo-overlay">
                                                 <button type="button" class="btn btn-danger btn-sm" 
                                                         onclick="removeExistingPhoto('{{ $photo }}')">
@@ -146,22 +147,36 @@
                                         </div>
                                     @endforeach
                                 </div>
+                                <div class="form-text">Current photos: {{ count($item->photos) }}/5</div>
                             </div>
                         @endif
 
                         <!-- Add New Photos -->
                         <div class="mb-3">
-                            <label for="photos" class="form-label">Add New Photos (Max 5 total)</label>
+                            <label for="photos" class="form-label">
+                                Add New Photos
+                                <span class="text-muted">(Max 5 total, 20MB per file)</span>
+                            </label>
                             <input type="file" class="form-control @error('photos') is-invalid @enderror" 
                                    id="photos" name="photos[]" accept="image/*" multiple>
                             @error('photos')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <div class="form-text">Upload JPG, PNG, or GIF files. Max 2MB per photo.</div>
+                            @error('photos.*')
+                                <div class="text-danger">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Upload JPG, PNG, or GIF files. Max 20MB per photo.</div>
                         </div>
 
                         <!-- New Photos Preview -->
                         <div id="newPhotosPreview" class="photos-grid"></div>
+                        
+                        <!-- Photo Count Display -->
+                        <div class="photo-count-display">
+                            <small class="text-muted">
+                                Total photos: <span id="totalPhotoCount">{{ count($item->photos ?? []) }}</span>/5
+                            </small>
+                        </div>
                     </div>
                 </div>
 
@@ -324,6 +339,12 @@
     overflow: hidden;
     aspect-ratio: 1;
     background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    transition: all 0.2s;
+}
+
+.photo-item:hover {
+    border-color: #2563eb;
 }
 
 .photo-item img {
@@ -338,7 +359,7 @@
     right: 0;
     left: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -352,6 +373,7 @@
 
 .photo-item.removed {
     opacity: 0.5;
+    border-color: #dc3545;
     position: relative;
 }
 
@@ -367,6 +389,14 @@
     border-radius: 4px;
     font-size: 0.8rem;
     font-weight: 600;
+}
+
+.photo-count-display {
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    text-align: center;
+    margin-top: 1rem;
 }
 
 /* Map */
@@ -393,6 +423,12 @@
 .actions {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Loading State */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
 }
 
 /* Responsive */
@@ -432,6 +468,7 @@
 @push('scripts')
 <script>
 let map, marker;
+let currentPhotoCount = {{ count($item->photos ?? []) }};
 
 // Initialize map
 function initMap() {
@@ -488,38 +525,53 @@ function searchOnMap() {
     alert('Geocoding search will be implemented here');
 }
 
-// Handle existing photo removal
+// ✅ FIXED: Handle existing photo removal
 function removeExistingPhoto(photoName) {
     const photoItem = document.querySelector(`[data-photo="${photoName}"]`);
-    if (photoItem) {
+    if (photoItem && !photoItem.classList.contains('removed')) {
         photoItem.classList.add('removed');
-        photoItem.querySelector('input[name="existing_photos[]"]').remove();
+        const hiddenInput = photoItem.querySelector('input[name="existing_photos[]"]');
+        if (hiddenInput) {
+            hiddenInput.remove();
+        }
+        currentPhotoCount--;
+        updatePhotoCount();
     }
 }
 
-// Handle new photo preview
+// ✅ FIXED: Handle new photo preview dengan validasi
 document.getElementById('photos').addEventListener('change', function(e) {
     const preview = document.getElementById('newPhotosPreview');
     preview.innerHTML = '';
     
     const files = Array.from(e.target.files);
     
+    // Check file size (20MB = 20971520 bytes)
+    for (let file of files) {
+        if (file.size > 20971520) {
+            alert(`File "${file.name}" terlalu besar. Maksimal 20MB per file.`);
+            e.target.value = '';
+            return;
+        }
+    }
+    
     // Check total photos limit
-    const existingPhotos = document.querySelectorAll('.photo-item:not(.removed)').length;
-    const totalPhotos = existingPhotos + files.length;
+    const existingPhotosCount = document.querySelectorAll('.photo-item:not(.removed)').length;
+    const totalPhotos = existingPhotosCount + files.length;
     
     if (totalPhotos > 5) {
-        alert('Maximum 5 photos allowed');
+        alert('Maksimal 5 foto total');
         e.target.value = '';
         return;
     }
     
+    // Show preview
     files.forEach((file, index) => {
         if (file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const photoDiv = document.createElement('div');
-                photoDiv.className = 'photo-item';
+                photoDiv.className = 'photo-item new-photo';
                 photoDiv.innerHTML = `
                     <img src="${e.target.result}" alt="New photo">
                     <div class="photo-overlay">
@@ -533,6 +585,8 @@ document.getElementById('photos').addEventListener('change', function(e) {
             reader.readAsDataURL(file);
         }
     });
+    
+    updatePhotoCount();
 });
 
 function removeNewPhoto(index) {
@@ -550,6 +604,25 @@ function removeNewPhoto(index) {
     input.dispatchEvent(new Event('change'));
 }
 
+// ✅ Update photo count display
+function updatePhotoCount() {
+    const existingCount = document.querySelectorAll('.photo-item:not(.removed):not(.new-photo)').length;
+    const newCount = document.querySelectorAll('.new-photo').length;
+    const total = existingCount + newCount;
+    
+    document.getElementById('totalPhotoCount').textContent = total;
+    
+    // Update photo count display color
+    const countDisplay = document.querySelector('.photo-count-display');
+    if (total > 5) {
+        countDisplay.classList.add('text-danger');
+        countDisplay.classList.remove('text-muted');
+    } else {
+        countDisplay.classList.remove('text-danger');
+        countDisplay.classList.add('text-muted');
+    }
+}
+
 // Status radio styling
 document.querySelectorAll('input[name="status"]').forEach(function(radio) {
     radio.addEventListener('change', function() {
@@ -563,10 +636,16 @@ document.querySelectorAll('input[name="status"]').forEach(function(radio) {
         } else {
             selectedCheck.classList.add('border-success', 'bg-light');
         }
+        
+        // Update event date label
+        const eventLabel = document.querySelector('label[for="event_date"]');
+        if (eventLabel) {
+            eventLabel.innerHTML = `Date ${this.value === 'lost' ? 'Lost' : 'Found'} <span class="text-danger">*</span>`;
+        }
     });
 });
 
-// Form validation
+// ✅ FIXED: Form validation dengan photo count check
 document.getElementById('editItemForm').addEventListener('submit', function(e) {
     const lat = document.getElementById('latitude').value;
     const lng = document.getElementById('longitude').value;
@@ -577,15 +656,29 @@ document.getElementById('editItemForm').addEventListener('submit', function(e) {
         return false;
     }
     
+    // Check photo count
+    const totalPhotos = document.querySelectorAll('.photo-item:not(.removed)').length + 
+                       document.querySelectorAll('.new-photo').length;
+    
+    if (totalPhotos > 5) {
+        e.preventDefault();
+        alert('Maksimal 5 foto total');
+        return false;
+    }
+    
     // Show loading state
     const updateBtn = document.getElementById('updateBtn');
     updateBtn.disabled = true;
     updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+    
+    // Add loading class to form
+    this.classList.add('loading');
 });
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initMap();
+    updatePhotoCount();
 });
 </script>
 @endpush

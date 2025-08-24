@@ -245,7 +245,7 @@
 /* Messages Container */
 .messages-container {
     flex: 1;
-    min-height: 0; /* 🔥 wajib di flexbox supaya overflow jalan */
+    min-height: 0; 
     padding: 1rem;
     overflow-y: auto;
     background: #f8f9fa;

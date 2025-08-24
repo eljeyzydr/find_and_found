@@ -11,71 +11,73 @@ use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
-  // Dalam CategoryController.php, update method index()
-public function index()
-{
-    $categories = Category::withCount(['items' => function($query) {
-            $query->active();
-        }])
-        ->active()
-        ->orderBy('name')
-        ->get();
+    public function index()
+    {
+        $categories = Category::withCount(['items' => function($query) {
+                $query->active();
+            }])
+            ->active()
+            ->orderBy('name')
+            ->get();
 
-    // Tambahkan stats
-    $stats = [
-        'total_lost' => \App\Models\Item::lost()->active()->count(),
-        'total_found' => \App\Models\Item::found()->active()->count(), 
-        'total_resolved' => \App\Models\Item::resolved()->count(),
-    ];
+        // Tambahkan stats
+        $stats = [
+            'total_lost' => \App\Models\Item::lost()->active()->count(),
+            'total_found' => \App\Models\Item::found()->active()->count(), 
+            'total_resolved' => \App\Models\Item::resolved()->count(),
+        ];
 
-    $recent_items = \App\Models\Item::with(['category', 'location'])
-        ->active()
-        ->latest()
-        ->take(8)
-        ->get();
+        $recent_items = \App\Models\Item::with(['category', 'location'])
+            ->active()
+            ->latest()
+            ->take(8)
+            ->get();
 
-    return view('categories.index', compact('categories', 'stats', 'recent_items'));
-}
+        return view('categories.index', compact('categories', 'stats', 'recent_items'));
+    }
 
     public function show($slug)
-{
-    $category = Category::where('slug', $slug)
-        ->where('is_active', true)
-        ->firstOrFail();
-    
-    $query = $category->items()
-        ->with(['user', 'location', 'comments'])
-        ->active();
+    {
+        $category = Category::where('slug', $slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+        
+        $query = $category->items()
+            ->with(['user', 'location'])
+            ->active();
 
-    // Filter by status if provided
-    if (request('status') && in_array(request('status'), ['lost', 'found'])) {
-        $query->where('status', request('status'));
+        // Filter by status if provided
+        if (request('status') && in_array(request('status'), ['lost', 'found'])) {
+            $query->where('status', request('status'));
+        }
+
+        // Sorting
+        switch (request('sort')) {
+            case 'oldest':
+                $query->oldest();
+                break;
+            case 'popular':
+                $query->orderBy('views_count', 'desc');
+                break;
+            default:
+                $query->latest();
+        }
+
+        $items = $query->paginate(12);
+
+        // Get related categories (optional)
+        $related_categories = Category::where('id', '!=', $category->id)
+            ->active()
+            ->withCount(['items' => function($query) {
+                $query->active();
+            }])
+            ->orderBy('items_count', 'desc')
+            ->take(4)
+            ->get();
+
+        return view('categories.show', compact('category', 'items', 'related_categories'));
     }
 
-    // Sorting
-    switch (request('sort')) {
-        case 'oldest':
-            $query->oldest();
-            break;
-        case 'popular':
-            $query->orderBy('views_count', 'desc');
-            break;
-        default:
-            $query->latest();
-    }
-
-    $items = $query->paginate(12);
-
-    // Get related categories (optional)
-    $related_categories = Category::where('id', '!=', $category->id)
-        ->active()
-        ->withCount('items')
-        ->orderBy('items_count', 'desc')
-        ->take(4)
-        ->get();
-
-    return view('categories.show', compact('category', 'items', 'related_categories'));
-}
     // Admin methods
     public function adminIndex()
     {
@@ -95,9 +97,9 @@ public function index()
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:categories',
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:500',
             'icon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:1024',
-            'is_active' => 'boolean',
+            'is_active' => 'nullable|boolean',
         ], [
             'name.required' => 'Nama kategori harus diisi.',
             'name.unique' => 'Nama kategori sudah ada.',
@@ -114,18 +116,20 @@ public function index()
             'name' => $request->name,
             'slug' => Str::slug($request->name),
             'description' => $request->description,
-            'is_active' => $request->has('is_active'),
+            'is_active' => $request->boolean('is_active', true),
         ];
 
         // Handle icon upload
         if ($request->hasFile('icon')) {
             $icon = $request->file('icon');
             $iconName = time() . '_' . Str::slug($request->name) . '.' . $icon->getClientOriginalExtension();
-            $icon->storeAs('public/icons', $iconName);
+            
+            // Store in public/uploads/icons directory
+            $iconPath = $icon->storeAs('uploads/icons', $iconName, 'public');
             $data['icon'] = $iconName;
         }
 
-        Category::create($data);
+        $category = Category::create($data);
 
         return redirect()->route('admin.categories.index')
             ->with('success', 'Kategori berhasil ditambahkan!');
@@ -143,9 +147,9 @@ public function index()
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
-            'description' => 'nullable|string',
+            'description' => 'nullable|string|max:500',
             'icon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:1024',
-            'is_active' => 'boolean',
+            'is_active' => 'nullable|boolean',
         ], [
             'name.required' => 'Nama kategori harus diisi.',
             'name.unique' => 'Nama kategori sudah ada.',
@@ -162,19 +166,21 @@ public function index()
             'name' => $request->name,
             'slug' => Str::slug($request->name),
             'description' => $request->description,
-            'is_active' => $request->has('is_active'),
+            'is_active' => $request->boolean('is_active', true),
         ];
 
         // Handle icon upload
         if ($request->hasFile('icon')) {
-            // Delete old icon
-            if ($category->icon && Storage::exists('public/icons/' . $category->icon)) {
-                Storage::delete('public/icons/' . $category->icon);
+            // Delete old icon if exists
+            if ($category->icon && Storage::disk('public')->exists('uploads/icons/' . $category->icon)) {
+                Storage::disk('public')->delete('uploads/icons/' . $category->icon);
             }
 
             $icon = $request->file('icon');
             $iconName = time() . '_' . Str::slug($request->name) . '.' . $icon->getClientOriginalExtension();
-            $icon->storeAs('public/icons', $iconName);
+            
+            // Store new icon
+            $iconPath = $icon->storeAs('uploads/icons', $iconName, 'public');
             $data['icon'] = $iconName;
         }
 
@@ -188,13 +194,14 @@ public function index()
     {
         $category = Category::findOrFail($id);
 
+        // Check if category has items
         if ($category->items()->count() > 0) {
             return back()->with('error', 'Kategori tidak dapat dihapus karena masih ada item yang menggunakannya.');
         }
 
-        // Delete icon
-        if ($category->icon && Storage::exists('public/icons/' . $category->icon)) {
-            Storage::delete('public/icons/' . $category->icon);
+        // Delete icon file if exists
+        if ($category->icon && Storage::disk('public')->exists('uploads/icons/' . $category->icon)) {
+            Storage::disk('public')->delete('uploads/icons/' . $category->icon);
         }
 
         $category->delete();
@@ -211,5 +218,4 @@ public function index()
         $status = $category->is_active ? 'diaktifkan' : 'dinonaktifkan';
         return back()->with('success', "Kategori berhasil {$status}!");
     }
-    
 }

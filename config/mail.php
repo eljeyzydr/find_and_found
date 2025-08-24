@@ -23,7 +23,7 @@ return [
     ],
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'noreply@findandfound.com'),
+        'address' => env('MAIL_FROM_ADDRESS', 'findandfound@admin.com'),
         'name' => env('MAIL_FROM_NAME', 'Find & Found'),
     ],
 

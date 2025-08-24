@@ -107,38 +107,40 @@ class ItemController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-            'status' => 'required|in:lost,found',
-            'event_date' => 'required|date|before_or_equal:today',
-            'photos' => 'nullable|array|max:5',
-            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480',
-            'address' => 'required|string',
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'city' => 'required|string|max:100',
-            'province' => 'nullable|string|max:100',
-        ], [
-            'title.required' => 'Judul harus diisi.',
-            'description.required' => 'Deskripsi harus diisi.',
-            'category_id.required' => 'Kategori harus dipilih.',
-            'status.required' => 'Status harus dipilih.',
-            'event_date.required' => 'Tanggal kejadian harus diisi.',
-            'event_date.before_or_equal' => 'Tanggal kejadian tidak boleh lebih dari hari ini.',
-            'photos.max' => 'Maksimal 5 foto.',
-            'photos.*.image' => 'File harus berupa gambar.',
-            'photos.*.max' => 'Ukuran foto maksimal 20MB.',
-            'address.required' => 'Alamat harus diisi.',
-            'latitude.required' => 'Koordinat GPS harus diisi.',
-            'longitude.required' => 'Koordinat GPS harus diisi.',
-            'city.required' => 'Kota harus diisi.',
-        ]);
+         $validator = Validator::make($request->all(), [
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+        'category_id' => 'required|exists:categories,id',
+        'status' => 'required|in:lost,found',
+        'event_date' => 'required|date|before_or_equal:today',
+        'photos' => 'nullable|array|max:5',
+        'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480', // 20MB = 20480 KB
+        'address' => 'required|string',
+        'latitude' => 'required|numeric|between:-90,90',
+        'longitude' => 'required|numeric|between:-180,180',
+        'city' => 'required|string|max:100',
+        'province' => 'nullable|string|max:100',
+        'existing_photos' => 'nullable|array',
+    ], [
+        'title.required' => 'Judul harus diisi.',
+        'description.required' => 'Deskripsi harus diisi.',
+        'category_id.required' => 'Kategori harus dipilih.',
+        'status.required' => 'Status harus dipilih.',
+        'event_date.required' => 'Tanggal kejadian harus diisi.',
+        'event_date.before_or_equal' => 'Tanggal kejadian tidak boleh lebih dari hari ini.',
+        'photos.max' => 'Maksimal 5 foto.',
+        'photos.*.image' => 'File harus berupa gambar.',
+        'photos.*.mimes' => 'Format foto harus jpeg, png, jpg, atau gif.',
+        'photos.*.max' => 'Ukuran foto maksimal 20MB.',
+        'address.required' => 'Alamat harus diisi.',
+        'latitude.required' => 'Koordinat GPS harus diisi.',
+        'longitude.required' => 'Koordinat GPS harus diisi.',
+        'city.required' => 'Kota harus diisi.',
+    ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
 
         // Create location first
         $location = Location::create([
@@ -192,12 +194,12 @@ class ItemController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $item = Item::with(['location'])->findOrFail($id);
+{
+    $item = Item::with(['location'])->findOrFail($id);
 
-        if (!$item->canBeEditedBy(Auth::user())) {
-            abort(403, 'Anda tidak dapat mengedit item ini.');
-        }
+    if (!$item->canBeEditedBy(Auth::user())) {
+        abort(403, 'Anda tidak dapat mengedit item ini.');
+    }
 
         // store()
 $validator = Validator::make($request->all(), [
@@ -237,50 +239,58 @@ $validator = Validator::make($request->all(), [
 
         // Update location
         $item->location->update([
-            'address' => $request->address,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'city' => $request->city,
-            'province' => $request->province,
-        ]);
+        'address' => $request->address,
+        'latitude' => $request->latitude,
+        'longitude' => $request->longitude,
+        'city' => $request->city,
+        'province' => $request->province,
+    ]);
 
         // Handle photos
         $existingPhotos = $request->existing_photos ?? [];
-        $newPhotos = [];
+    $newPhotos = [];
 
         // Process new photo uploads
         if ($request->hasFile('photos')) {
-            foreach ($request->file('photos') as $photo) {
-                $photoName = time() . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
-                $photo->storeAs('public/items', $photoName);
-                $newPhotos[] = $photoName;
-            }
+        foreach ($request->file('photos') as $photo) {
+            $photoName = time() . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
+            
+            // ✅ Store ke public disk dalam folder items
+            $photo->storeAs('items', $photoName, 'public');
+            
+            $newPhotos[] = $photoName;
         }
+    }
 
         // Delete removed photos
         if ($item->photos) {
-            foreach ($item->photos as $oldPhoto) {
-                if (!in_array($oldPhoto, $existingPhotos)) {
-                    Storage::delete('public/items/' . $oldPhoto);
-                }
+        foreach ($item->photos as $oldPhoto) {
+            if (!in_array($oldPhoto, $existingPhotos)) {
+                // Delete from storage
+                Storage::disk('public')->delete('items/' . $oldPhoto);
             }
         }
+    }
 
         // Combine existing and new photos
         $allPhotos = array_merge($existingPhotos, $newPhotos);
 
+if (count($allPhotos) > 5) {
+        return back()->withErrors(['photos' => 'Total foto tidak boleh lebih dari 5.'])->withInput();
+    }
+
         // Update item
         $item->update([
-            'title' => $request->title,
-            'description' => $request->description,
-            'category_id' => $request->category_id,
-            'status' => $request->status,
-            'event_date' => $request->event_date,
-            'photos' => $allPhotos,
-        ]);
+        'title' => $request->title,
+        'description' => $request->description,
+        'category_id' => $request->category_id,
+        'status' => $request->status,
+        'event_date' => $request->event_date,
+        'photos' => $allPhotos,
+    ]);
 
-        return redirect()->route('items.show', $item->id)
-            ->with('success', 'Item berhasil diperbarui!');
+    return redirect()->route('items.show', $item->id)
+        ->with('success', 'Item berhasil diperbarui!');
     }
 
     public function destroy($id)

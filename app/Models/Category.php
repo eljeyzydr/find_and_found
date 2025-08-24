@@ -67,7 +67,8 @@ class Category extends Model
     public function getIconUrlAttribute()
     {
         if ($this->icon) {
-            return asset('uploads/icons/' . $this->icon);
+            // Pastikan path konsisten dengan storage
+            return asset('storage/uploads/icons/' . $this->icon);
         }
         return asset('images/default-category.png');
     }
