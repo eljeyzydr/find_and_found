@@ -108,6 +108,8 @@ DB_PASSWORD=your_mysql_password_here
 
 4) Instalasi mail di .env
 login di mailtrap buatsandbox lalu copy host,port,username,password
+
+```
 MAIL_MAILER=smtp
 MAIL_HOST=sandbox.smtp.mailtrap.io
 MAIL_PORT=(port mailtrap)
@@ -116,6 +118,7 @@ MAIL_PASSWORD=(your password in mailtrap)
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS="noreply@findandfound.com"
 MAIL_FROM_NAME="Find & Found"
+```
 
 5) Install dependensi PHP (Composer)
 
