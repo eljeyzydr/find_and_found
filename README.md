@@ -1,61 +1,186 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Find & Found — Dokumentasi dan Panduan Instalasi (Bahasa Indonesia)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Ringkasan Singkat
+Find & Found adalah aplikasi berbasis Laravel (PHP) untuk melaporkan dan menemukan barang hilang/ketemu. Fitur utama meliputi registrasi/login, pelaporan item (foto + lokasi), pencarian berdasarkan kategori/ lokasi/ kata kunci, sistem chat antar pengguna, moderasi/admin, serta notifikasi dan laporan.
 
-## About Laravel
+Dokumentasi ini menjelaskan struktur proyek, fungsi file/folder penting yang telah ditelaah, dan panduan instalasi lengkap pada Windows (PowerShell) menggunakan MySQL.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Checklist Persyaratan Permintaan
+- [x] Menjelaskan fungsi folder dan file utama dalam proyek (bahasa Indonesia)
+- [x] Menyusun panduan instalasi lengkap menggunakan MySQL pada Windows PowerShell
+- [x] Menyertakan perintah yang dapat ditempelkan pada PowerShell dan penjelasan singkat
+- [x] Menambahkan informasi kredensial seeder demo dan catatan keamanan
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Kontrak Singkat (inputs / outputs / sukses)
+- Input: kode sumber (repo ini), MySQL berjalan, PHP & Composer, Node/npm
+- Output: Aplikasi berjalan lokal di http://127.0.0.1:8000
+- Sukses: Bisa mengunjungi halaman utama, login admin demo, dan melihat data yang di-seed.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Edge cases yang diperhatikan:
+- DB MySQL belum dibuat => panduan membuat DB
+- File storage belum di-link => perintah `php artisan storage:link`
+- Kredensial default harus diubah di production
 
-## Learning Laravel
+## Struktur Direktori & Fungsi (ringkas)
+Berikut ringkasan folder/file penting dan fungsinya yang relevan:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- `app/Models/` — Model Eloquent; berisi logika domain dan relasi:
+  - `User.php` — model user, autentikasi, relasi (items, comments, chats), helper (avatar, role).
+  - `Item.php` — model item (hilang/ditemukan), foto (json array), lokasi, status, scope pencarian, helper untuk foto dan view count.
+  - `Category.php` — kategori item; event untuk membuat slug otomatis; scope `active()`.
+  - `Location.php` — menyimpan alamat, koordinat; ada fungsi jarak dan scope untuk radius.
+  - `Comment.php` — komentar pada item, approval, notifikasi ketika dibuat.
+  - `Chat.php` — pesan antar pengguna; scope untuk percakapan, notifikasi saat pesan dibuat.
+  - `Report.php` — laporan abuse/reporting untuk item; status workflow (pending/reviewed/resolved/rejected).
+  - `Notification.php` — notifikasi internal untuk user.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- `app/Http/Controllers/` — meng-handle request dan business flow:
+  - `AuthController.php` — login, register, lupa password, reset password.
+  - `HomeController.php` — halaman utama, pencarian, browse, about, contact, FAQ.
+  - `ItemController.php` — CRUD item, upload foto, lokasi, daftar milik user, mark resolved.
+  - `CategoryController.php`, `LocationController.php`, `CommentController.php`, `ChatController.php`, `ReportController.php` — fitur masing-masing area.
+  - `AdminController.php` — dashboard admin, manajemen user/item/category/comments/reports.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- `routes/web.php` — semua route aplikasi (publik, guest, auth, admin). Menentukan endpoint seperti `/items`, `/chats`, `/admin/*`.
 
-## Laravel Sponsors
+- `resources/views/` — blade templates untuk frontend (layout, halaman item, admin dashboard, auth, dll.).
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- `database/migrations/` — skema tabel: users, items (photos json), categories, locations, comments, chats, reports, notifications, dll.
 
-### Premium Partners
+- `database/seeders/` — data awal:
+  - `UserSeeder` — membuat 1 admin dan 2 user demo (password: `password`).
+  - `CategorySeeder` — beberapa kategori default (Elektronik, Dokumen, dsb.).
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- `public/` — entri publik dan folder `uploads/` untuk foto; `storage` di-link ke `storage/app/public`.
 
-## Contributing
+- `composer.json` — dependensi PHP (Laravel 12, Sanctum, dll.) dan beberapa script artisan.
+- `package.json` — dev dependencies untuk asset pipeline (Vite, Tailwind, dll.)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Kredensial Demo (dari Seeder)
+- Admin:
+  - Email: `admin@findandfound.com`
+  - Password: `password`
 
-## Code of Conduct
+- User demo:
+  - `john@example.com` / `password`
+  - `jane@example.com` / `password`
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+(cuma demo)
 
-## Security Vulnerabilities
+Ganti kredensial ini ketika dipakai di lingkungan produksi.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Panduan Instalasi Lengkap (Windows PowerShell)
+Langkah-langkah di bawah diasumsikan Anda bekerja pada Windows PowerShell (v5.1). Ubah sesuai kebutuhan jika menggunakan WSL, Docker, atau environment lain.
 
-## License
+1) Prasyarat
+- PHP >= 8.2 dengan ekstensi: pdo_mysql, mbstring, openssl, tokenizer, curl, fileinfo
+- Composer (https://getcomposer.org)
+- MySQL server
+- Git (opsional)
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+2) Clone repository dan pindah ke folder proyek
+
+```powershell
+# contoh: jika belum di-clone
+git clone <repo-url> findandfound
+cd 'c:\New folder (2)\findandfound'
+```
+
+3) Copy file lingkungan dan edit `.env`
+
+```powershell
+# buat salinan .env
+copy .env.example .env
+# lalu buka .env  VS Code
+.env
+```
+
+Ubah konfigurasi database di `.env` menjadi seperti ini (contoh):
+
+```
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=findandfound
+DB_USERNAME=root
+DB_PASSWORD=your_mysql_password_here
+```
+
+4) Instalasi mail di .env
+login di mailtrap buatsandbox lalu copy host,port,username,password
+MAIL_MAILER=smtp
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=(port mailtrap)
+MAIL_USERNAME=(your usename host in mailtrap)
+MAIL_PASSWORD=(your password in mailtrap)
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@findandfound.com"
+MAIL_FROM_NAME="Find & Found"
+
+5) Install dependensi PHP (Composer)
+
+```powershell
+composer install --no-interaction --prefer-dist
+```
+
+6) Install dependensi Node
+
+```powershell
+npm install
+```
+
+7) Buat APP_KEY, jalankan migrasi dan seeder
+Pastikan file `.env` sudah berisi kredensial DB MySQL yang benar.
+
+```powershell
+# generate key
+php artisan key:generate
+
+# jalankan migrasi ke MySQL
+php artisan migrate
+
+# jalankan seeder
+php artisan db:seed
+```
+
+Catatan: composer.json juga memiliki script yang dapat menjalankan `artisan migrate` setelah install di beberapa kondisi. Kami merekomendasikan menjalankan perintah di atas secara eksplisit untuk transparansi.
+
+8) Buat symbolic link untuk storage (agar file upload bisa diakses dari public)
+
+```powershell
+php artisan storage:link
+```
+
+9) Build atau jalankan assets (development)
+
+```powershell
+# untuk development (hot reload)
+npm run dev
+
+# atau untuk produksi (build statis)
+npm run build
+```
+
+10) Jalankan server lokal
+
+```powershell
+php artisan serve
+# hasil: http://127.0.0.1:8000
+```
+
+11) Cek aplikasi
+Buka browser ke `http://127.0.0.1:8000`. Login dengan kredensial admin demo jika ingin masuk ke area admin.
+
+## Troubleshooting Singkat
+- Error koneksi DB: cek variabel DB_* di `.env`, pastikan MySQL berjalan dan user/password benar.
+- Migration error (foreign key): pastikan semua migrasi berada di folder `database/migrations` dan urutannya benar. Hapus DB dan buat ulang jika perlu untuk development.
+- Tidak bisa upload gambar: pastikan `storage/app/public/items` ada dan `php artisan storage:link` telah dijalankan.
+- `mysql` command not found: tambahkan folder bin MySQL ke PATH atau gunakan GUI untuk membuat database.
+
+## Penjelasan Fitur Utama (singkat)
+- Registrasi & Auth: user dapat daftar, login, reset password.
+- Laporkan barang: user membuat posting (status lost/found) dengan foto dan lokasi (latitude/longitude + city).
+- Pencarian: full-text-like search pada judul/deskripsi, filter kategori, kota, radius lokasi.
+- Chat: user dapat saling chat terkait item; chat membuat notifikasi otomatis.
+- Komentar: user bisa komentar pada item; pemilik item mendapat notifikasi.
+- Admin: manajemen user, item, kategori, komentar, chat, laporan.
